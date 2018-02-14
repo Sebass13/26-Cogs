@@ -296,18 +296,24 @@ class Rift:
             if not (autmember or is_owner):
                 continue
             botmember = server.me
-            matches |= {c for c in server.channels if c.type.name == "text" and
-                        (not autmember or
-                         c.permissions_for(autmember).read_messages) and
-                        c.permissions_for(botmember).read_messages and
-                        c.permissions_for(botmember).send_messages and
-                        (str(c) == search or c.name == search or c.id ==
-                         search or c.mention == search)} | \
-                       {m for m in server.members if str(m) == search or
-                        m.name == search or m.id == search or server ==
-                        thisserver and m.display_name == search or
-                        m.mention.replace("!", "") == search.replace("!", "")}
-        matches.discard(self.bot.user)
+            def channelfilter(c):
+                if c.type != discord.ChannelType.text:
+                    return False
+                if autmember and not c.permissions_for(autmember).read_messages:
+                    return False
+                if not c.permissions_for(botmember).send_messages:
+                    return False
+                return search in (str(c), c.name, c.id, c.mention)
+            matches.update(filter(channelfilter, server.channels))
+            def memberfilter(m):
+                if m.bot:
+                    return False
+                if server == thisserver and m.display_name == search:
+                    return True
+                if m.mention.replace("!", "") == search.replace("!", ""):
+                    return True
+                return search in (str(m), m.name, m.id)
+            matches.update(filter(memberfilter, server.members))
         return matches
 
     async def _process_message(self, rift, message, dest):
